@@ -108,14 +108,51 @@ int main(int argc, char **argv)
 	 * - After time loop, copy final state back to host for printing
 	 */
 	// Allocate device arrays for CUDA computation
-	cudaMalloc((void**)&d_hPos, sizeof(vector3) * NUMENTITIES);
-	cudaMalloc((void**)&d_hVel, sizeof(vector3) * NUMENTITIES);
-	cudaMalloc((void**)&d_mass, sizeof(double) * NUMENTITIES);
+	cudaError_t err;
+	err = cudaMalloc((void**)&d_hPos, sizeof(vector3) * NUMENTITIES);
+	if (err != cudaSuccess) {
+		fprintf(stderr, "CUDA malloc error for d_hPos: %s\n", cudaGetErrorString(err));
+		return 1;
+	}
+	err = cudaMalloc((void**)&d_hVel, sizeof(vector3) * NUMENTITIES);
+	if (err != cudaSuccess) {
+		fprintf(stderr, "CUDA malloc error for d_hVel: %s\n", cudaGetErrorString(err));
+		cudaFree(d_hPos);
+		return 1;
+	}
+	err = cudaMalloc((void**)&d_mass, sizeof(double) * NUMENTITIES);
+	if (err != cudaSuccess) {
+		fprintf(stderr, "CUDA malloc error for d_mass: %s\n", cudaGetErrorString(err));
+		cudaFree(d_hPos);
+		cudaFree(d_hVel);
+		return 1;
+	}
 	
 	// Copy initial state from host to device
-	cudaMemcpy(d_hPos, hPos, sizeof(vector3) * NUMENTITIES, cudaMemcpyHostToDevice);
-	cudaMemcpy(d_hVel, hVel, sizeof(vector3) * NUMENTITIES, cudaMemcpyHostToDevice);
-	cudaMemcpy(d_mass, mass, sizeof(double) * NUMENTITIES, cudaMemcpyHostToDevice);
+	err = cudaMemcpy(d_hPos, hPos, sizeof(vector3) * NUMENTITIES, cudaMemcpyHostToDevice);
+	if (err != cudaSuccess) {
+		fprintf(stderr, "CUDA memcpy error (H2D d_hPos): %s\n", cudaGetErrorString(err));
+		cudaFree(d_hPos);
+		cudaFree(d_hVel);
+		cudaFree(d_mass);
+		return 1;
+	}
+	err = cudaMemcpy(d_hVel, hVel, sizeof(vector3) * NUMENTITIES, cudaMemcpyHostToDevice);
+	if (err != cudaSuccess) {
+		fprintf(stderr, "CUDA memcpy error (H2D d_hVel): %s\n", cudaGetErrorString(err));
+		cudaFree(d_hPos);
+		cudaFree(d_hVel);
+		cudaFree(d_mass);
+		return 1;
+	}
+	err = cudaMemcpy(d_mass, mass, sizeof(double) * NUMENTITIES, cudaMemcpyHostToDevice);
+	if (err != cudaSuccess) {
+		fprintf(stderr, "CUDA memcpy error (H2D d_mass): %s\n", cudaGetErrorString(err));
+		cudaFree(d_hPos);
+		cudaFree(d_hVel);
+		cudaFree(d_mass);
+		return 1;
+	}
 	
 	//now we have a system.
 	#ifdef DEBUG
@@ -127,8 +164,14 @@ int main(int argc, char **argv)
 	clock_t t1=clock()-t0;
 	
 	// Copy final state from device back to host (for printSystem)
-	cudaMemcpy(hPos, d_hPos, sizeof(vector3) * NUMENTITIES, cudaMemcpyDeviceToHost);
-	cudaMemcpy(hVel, d_hVel, sizeof(vector3) * NUMENTITIES, cudaMemcpyDeviceToHost);
+	err = cudaMemcpy(hPos, d_hPos, sizeof(vector3) * NUMENTITIES, cudaMemcpyDeviceToHost);
+	if (err != cudaSuccess) {
+		fprintf(stderr, "CUDA memcpy error (D2H hPos): %s\n", cudaGetErrorString(err));
+	}
+	err = cudaMemcpy(hVel, d_hVel, sizeof(vector3) * NUMENTITIES, cudaMemcpyDeviceToHost);
+	if (err != cudaSuccess) {
+		fprintf(stderr, "CUDA memcpy error (D2H hVel): %s\n", cudaGetErrorString(err));
+	}
 	
 #ifdef DEBUG
 	printSystem(stdout);
@@ -136,9 +179,19 @@ int main(int argc, char **argv)
 	printf("This took a total time of %f seconds\n",(double)t1/CLOCKS_PER_SEC);
 
 	// Free device arrays
-	cudaFree(d_hPos);
-	cudaFree(d_hVel);
-	cudaFree(d_mass);
+	err = cudaFree(d_hPos);
+	if (err != cudaSuccess) {
+		fprintf(stderr, "CUDA free error for d_hPos: %s\n", cudaGetErrorString(err));
+	}
+	err = cudaFree(d_hVel);
+	if (err != cudaSuccess) {
+		fprintf(stderr, "CUDA free error for d_hVel: %s\n", cudaGetErrorString(err));
+	}
+	err = cudaFree(d_mass);
+	if (err != cudaSuccess) {
+		fprintf(stderr, "CUDA free error for d_mass: %s\n", cudaGetErrorString(err));
+	}
 	
 	freeHostMemory();
+	return 0;
 }

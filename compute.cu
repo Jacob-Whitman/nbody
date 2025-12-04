@@ -191,7 +191,13 @@ extern "C" void compute() {
         if (d_accels != NULL) {
             cudaFree(d_accels);
         }
-        cudaMalloc((void**)&d_accels, sizeof(vector3) * NUMENTITIES * NUMENTITIES);
+        cudaError_t err = cudaMalloc((void**)&d_accels, sizeof(vector3) * NUMENTITIES * NUMENTITIES);
+        if (err != cudaSuccess) {
+            #ifdef DEBUG
+            fprintf(stderr, "CUDA malloc error for d_accels: %s\n", cudaGetErrorString(err));
+            #endif
+            return;
+        }
         allocated_size = NUMENTITIES;
     }
     
@@ -232,15 +238,13 @@ extern "C" void compute() {
         #endif
     }
     
-    // Synchronize to ensure kernels complete
-    cudaDeviceSynchronize();
-    
-    // Optional: Check for runtime errors
-    err = cudaGetLastError();
+    // Synchronize to ensure kernels complete and check for errors
+    err = cudaDeviceSynchronize();
     if (err != cudaSuccess) {
         #ifdef DEBUG
-        fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(err));
+        fprintf(stderr, "CUDA synchronization error: %s\n", cudaGetErrorString(err));
         #endif
+        // Don't return error here, but log it for debugging
     }
 }
 
